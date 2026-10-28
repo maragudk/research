@@ -1,0 +1,1785 @@
+<title>Glimmerblob</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A quirky, sparkly pocket creature to feed weird snacks, boop, polish and put to bed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=DynaPuff:wght@400;600;700&display=swap">
+<style>
+/* Layout: one full-bleed WebGL stage under a lagoon-night sky; stats float on top, a chunky toy tray sits at the bottom.
+   Deliberately single-theme: the pet lives at night, whatever the host theme is. */
+:root {
+  --night: #0b1d29;
+  --lagoon: #1f5462;
+  --cream: #fff5e6;
+  --cream-shade: #d9bfa6;
+  --ink: #1d1a2e;
+  --butter: #ffe38a;
+  --gum: #ff86bd;
+  --mint: #8ef0cf;
+  --peach: #ffb48c;
+  --glass: rgba(9, 26, 37, 0.62);
+  --glass-edge: rgba(255, 245, 230, 0.14);
+  --font-display: 'Bagel Fat One', 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif;
+  --font-ui: 'DynaPuff', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--night);
+  color: var(--cream);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#sky {
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(120% 75% at 50% 42%, #2b6b72 0%, #17414f 40%, #0b1d29 78%),
+    var(--night);
+}
+#sky::after {
+  content: ""; position: absolute;
+  width: 34vmin; height: 34vmin; right: -7vmin; top: 24%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #fff6e4 0%, #ffd8b4 48%, rgba(255, 196, 160, 0) 71%);
+  opacity: 0.32;
+}
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#dusk {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 45%, rgba(5, 10, 30, 0.12), rgba(3, 6, 18, 0.6));
+  opacity: 0; transition: opacity 1.4s ease;
+}
+body.night #dusk { opacity: 1; }
+
+/* ---------- top HUD ---------- */
+.hud {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  pointer-events: none;
+}
+.hud-inner { max-width: 560px; margin: 0 auto; display: grid; gap: 10px; position: relative; }
+.idrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ident { min-width: 0; display: grid; gap: 2px; pointer-events: auto; }
+#petName {
+  font-family: var(--font-display); font-size: 30px; line-height: 1.05;
+  color: var(--cream); background: transparent; border: 0; padding: 0; margin: 0;
+  width: 100%; max-width: 15ch; outline: none; letter-spacing: 0.01em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), 0 0 18px rgba(255, 134, 189, 0.35);
+  border-radius: 8px;
+}
+#petName:focus-visible { box-shadow: 0 0 0 2px var(--butter); }
+.meta { font-size: 13px; opacity: 0.85; display: flex; flex-wrap: wrap; gap: 4px 10px; font-variant-numeric: tabular-nums; }
+.meta b { font-weight: 600; color: var(--butter); }
+.tools { display: flex; gap: 8px; pointer-events: auto; flex-shrink: 0; }
+.iconbtn {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--glass-edge); background: var(--glass); color: var(--cream);
+  display: grid; place-items: center; cursor: pointer; padding: 0;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.iconbtn svg { width: 20px; height: 20px; }
+.iconbtn:focus-visible, .act:focus-visible, .confirm button:focus-visible { outline: 3px solid var(--butter); outline-offset: 2px; }
+
+.stats {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+  padding: 10px 12px; border-radius: 18px;
+  background: var(--glass); border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.stat { display: grid; gap: 5px; min-width: 0; }
+.stat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { height: 9px; border-radius: 99px; background: rgba(255, 245, 230, 0.13); overflow: hidden; }
+.fill { display: block; height: 100%; width: 50%; border-radius: inherit; background: var(--c); box-shadow: 0 0 10px var(--c); transition: width 0.3s ease; }
+.stat[data-stat="tummy"] { --c: var(--butter); }
+.stat[data-stat="giggles"] { --c: var(--gum); }
+.stat[data-stat="shine"] { --c: var(--mint); }
+.stat[data-stat="pep"] { --c: var(--peach); }
+.stat.low .stat-label { color: var(--c); animation: nag 1.1s ease-in-out infinite; }
+@keyframes nag { 50% { opacity: 0.35; } }
+
+.confirm {
+  position: absolute; right: 0; top: 52px;
+  background: var(--cream); color: var(--ink); border-radius: 16px; padding: 12px; width: 220px;
+  display: grid; gap: 10px; pointer-events: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-size: 14px; z-index: 5;
+}
+.confirm p { margin: 0; }
+.confirm .row { display: flex; gap: 8px; }
+.confirm button {
+  flex: 1; font: 600 14px var(--font-ui); border-radius: 12px; border: 0; padding: 9px 6px; cursor: pointer;
+  background: rgba(29, 26, 46, 0.08); color: var(--ink);
+}
+.confirm button.danger { background: var(--ink); color: var(--cream); }
+
+/* ---------- action tray ---------- */
+.tray-wrap {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  pointer-events: none;
+}
+.tray { max-width: 520px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; pointer-events: auto; }
+.act {
+  font: 600 14px var(--font-ui); color: var(--ink);
+  background: var(--cream); border: 0; border-radius: 22px;
+  padding: 9px 4px 8px; min-height: 70px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  box-shadow: 0 5px 0 var(--cream-shade), 0 10px 22px rgba(0, 0, 0, 0.3);
+  cursor: pointer; transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.2s;
+  touch-action: manipulation;
+}
+.act:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 var(--cream-shade), 0 4px 10px rgba(0, 0, 0, 0.3); }
+.act:disabled { opacity: 0.45; cursor: default; }
+.act .ico { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--c); }
+.act svg { width: 22px; height: 22px; }
+.act[data-c="butter"] { --c: var(--butter); }
+.act[data-c="gum"] { --c: var(--gum); }
+.act[data-c="mint"] { --c: var(--mint); }
+.act[data-c="peach"] { --c: var(--peach); }
+
+/* ---------- overlays ---------- */
+#speech {
+  position: fixed; left: 0; top: 0; z-index: 3;
+  max-width: min(240px, 70vw); padding: 9px 13px;
+  background: var(--cream); color: var(--ink);
+  border-radius: 18px; font-size: 15px; line-height: 1.3; text-align: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  pointer-events: none; opacity: 0; transform-origin: 50% 100%;
+  transition: opacity 0.18s ease;
+}
+#speech.show { opacity: 1; }
+#speech::after {
+  content: ""; position: absolute; left: var(--tail, 50%); bottom: -7px; width: 14px; height: 14px;
+  background: var(--cream); transform: translateX(-50%) rotate(45deg); border-radius: 3px;
+}
+#hint {
+  position: fixed; left: 0; right: 0; z-index: 2;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  text-align: center; pointer-events: none;
+  opacity: 0; transition: opacity 0.4s ease;
+}
+#hint span {
+  display: inline-block; padding: 8px 14px; border-radius: 99px;
+  background: var(--glass); border: 1px solid var(--glass-edge); font-size: 14px;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+#hint.show { opacity: 1; }
+body.egg #hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); }
+body.egg .tray-wrap { display: none; }
+body.egg .stats { visibility: hidden; }
+
+.floater {
+  position: fixed; left: 0; top: 0; z-index: 2; pointer-events: none; white-space: nowrap;
+  font-family: var(--font-display); font-size: 17px; color: var(--c, var(--cream));
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3), 0 0 12px var(--c, transparent);
+  animation: floatUp 1.5s ease-out forwards;
+}
+.floater.z { font-size: 22px; animation-name: floatZ; animation-duration: 2.6s; --c: #cfe0ff; }
+@keyframes floatUp {
+  0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+  15% { transform: translate(-50%, -14px) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -70px) scale(1); opacity: 0; }
+}
+@keyframes floatZ {
+  0% { transform: translate(-50%, 0) scale(0.5) rotate(-10deg); opacity: 0; }
+  20% { opacity: 0.9; }
+  100% { transform: translate(10px, -90px) scale(1.3) rotate(12deg); opacity: 0; }
+}
+#loaderr { position: fixed; inset: auto 16px 50% 16px; text-align: center; font-size: 15px; }
+
+@media (min-width: 700px) {
+  #petName { font-size: 36px; }
+  .act { min-height: 78px; font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .floater, .floater.z { animation-duration: 0.9s; }
+  .stat.low .stat-label { animation: none; }
+}
+</style>
+
+<div id="sky"></div>
+<canvas id="stage" aria-label="Your glimmerblob. Tap to boop, drag across it to polish."></canvas>
+<div id="dusk"></div>
+
+<header class="hud">
+  <div class="hud-inner">
+    <div class="idrow">
+      <div class="ident">
+        <input id="petName" maxlength="16" spellcheck="false" autocomplete="off" aria-label="Your pet's name" value="">
+        <div class="meta"><span id="age">an egg</span><span>Lv <b id="lvl">1</b></span><span id="mood"></span></div>
+      </div>
+      <div class="tools">
+        <button class="iconbtn" id="btnSound" aria-label="Sound on" aria-pressed="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="none"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5" style="display:none"/></svg>
+        </button>
+        <button class="iconbtn" id="btnRestart" aria-label="Start over with a new egg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5"/><path d="M4 4v4.5h4.5"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat" data-stat="tummy" role="meter" aria-label="Tummy" aria-valuemin="0" aria-valuemax="100"><span class="stat-label">Tummy</span><span class="bar"><span class="fill"></span></span></div>
+      <div class="stat" data-stat="giggles" role="meter" aria-label="Giggles" aria-valuemin="0" aria-valuemax="100"><span class="stat-label">Giggles</span><span class="bar"><span class="fill"></span></span></div>
+      <div class="stat" data-stat="shine" role="meter" aria-label="Shine" aria-valuemin="0" aria-valuemax="100"><span class="stat-label">Shine</span><span class="bar"><span class="fill"></span></span></div>
+      <div class="stat" data-stat="pep" role="meter" aria-label="Pep" aria-valuemin="0" aria-valuemax="100"><span class="stat-label">Pep</span><span class="bar"><span class="fill"></span></span></div>
+    </div>
+    <div class="confirm" id="confirm" hidden>
+      <p>Trade this blob in for a brand new egg? It can't be undone.</p>
+      <div class="row"><button id="btnNo">Keep it</button><button class="danger" id="btnYes">New egg</button></div>
+    </div>
+  </div>
+</header>
+
+<div id="speech" role="status" aria-live="polite"></div>
+<div id="hint"><span></span></div>
+
+<div class="tray-wrap">
+  <nav class="tray" aria-label="Care actions">
+    <button class="act" id="btnSnack" data-c="butter"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 18L20 6.5l1.2 11.5z" fill="#1d1a2e"/><circle cx="15.6" cy="14.6" r="1.6" fill="#ffe38a"/><circle cx="11" cy="16.2" r="1" fill="#ffe38a"/><circle cx="18.6" cy="11" r="0.9" fill="#ffe38a"/></svg></span><span>Snack</span></button>
+    <button class="act" id="btnPlay" data-c="gum"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#1d1a2e" stroke-width="2"><circle cx="9.5" cy="13.5" r="6"/><circle cx="18" cy="6.5" r="3"/><circle cx="19" cy="16" r="1.8"/><path d="M6.6 11.6a3.2 3.2 0 0 1 2.4-1.8" stroke-linecap="round"/></svg></span><span>Bubbles</span></button>
+    <button class="act" id="btnPolish" data-c="mint"><span class="ico"><svg viewBox="0 0 24 24"><path d="M11 2.5c.9 5.6 3 7.9 8.5 8.8-5.5.9-7.6 3.2-8.5 8.8-.9-5.6-3-7.9-8.5-8.8 5.5-.9 7.6-3.2 8.5-8.8z" fill="#1d1a2e"/><path d="M19.5 15c.3 2 1 2.8 3 3.1-2 .3-2.7 1.1-3 3.1-.3-2-1-2.8-3-3.1 2-.3 2.7-1.1 3-3.1z" fill="#1d1a2e"/></svg></span><span>Polish</span></button>
+    <button class="act" id="btnNap" data-c="peach"><span class="ico"><svg viewBox="0 0 24 24"><path d="M14.5 3.2a8.8 8.8 0 1 0 6.3 13.6A7.2 7.2 0 0 1 14.5 3.2z" fill="#1d1a2e"/></svg></span><span id="napLabel">Nap</span></button>
+  </nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+'use strict';
+const $ = (s) => document.querySelector(s);
+if (!window.THREE) {
+  const p = document.createElement('p');
+  p.id = 'loaderr';
+  p.textContent = "The 3D engine didn't load. Check your connection and reload the page.";
+  document.body.appendChild(p);
+  return;
+}
+const THREE = window.THREE;
+const V3 = THREE.Vector3;
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------------------------------------------------------------- helpers
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const elastic = (t) => t === 0 || t === 1 ? t : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (2 * Math.PI) / 3) + 1;
+
+// ---------------------------------------------------------------- content
+const STAT_KEYS = ['tummy', 'giggles', 'shine', 'pep'];
+const STAT_LABEL = { tummy: 'tummy', giggles: 'giggles', shine: 'shine', pep: 'pep' };
+const STAT_COLOR = { tummy: '#ffe38a', giggles: '#ff86bd', shine: '#8ef0cf', pep: '#ffb48c' };
+// Seconds to drain a full bar while awake.
+const DRAIN = { tummy: 5 * 3600, giggles: 4 * 3600, shine: 6 * 3600, pep: 8 * 3600 };
+const SPARK_COLORS = [0xffe38a, 0xff86bd, 0x8ef0cf, 0xb9a4ff, 0xffffff, 0xffb48c];
+
+const NAME_A = ['Blip', 'Zuzu', 'Mochi', 'Fizz', 'Pim', 'Glim', 'Wob', 'Nib', 'Squee', 'Lumi', 'Boba', 'Tuft', 'Plink', 'Dootle', 'Smoosh'];
+const NAME_B = ['kins', 'ster', 'ble', 'o', 'ette', '', '', 'puff', 'bean'];
+const makeName = () => { const n = pick(NAME_A) + pick(NAME_B); return n.length > 10 ? n.slice(0, 10) : n; };
+
+const IDLE_LINES = [
+  'i licked a cloud once. it tasted like tuesday.',
+  'do you think socks have dreams?',
+  'bloop.',
+  'i am 40% glitter by volume.',
+  'the moon owes me three dollars.',
+  'sometimes i blink on purpose.',
+  'my favorite number is purple.',
+  'i counted all the stars. there were some.',
+  "please don't tell the dust bunnies where i live.",
+  "i'm not round. i'm aerodynamic.",
+  'what if the island is also a pet?',
+  "i have one bone. i don't know where it is.",
+  'i can hear colors. pink is loud.',
+];
+const NEED_LINES = {
+  tummy: ['my tummy is doing the echo thing.', "is it snack o'clock? it feels like snack o'clock.", 'i would eat a sock right now. i mean it.'],
+  giggles: ["boop me. it's medically necessary.", 'i would like one (1) bubble, please.', "i'm bored in a very round way."],
+  shine: ['i feel like a pebble. a matte pebble.', 'can you polish my aura? rub it a bit.', 'my sparkle is buffering.'],
+  pep: ['eyes… are… heavy…', 'i need a nap and a tiny blanket.', '*yawns in sparkle*'],
+};
+const BOOP_LINES = ['hee!', 'boop received.', "that's my good side.", 'beep.', 'again?', 'you found my button.', 'squish!'];
+const DREAM_LINES = ['i dreamt i was a spoon.', 'i dreamt about a very polite moth.', 'i was a cloud for a while. it was damp.', 'i dreamt in a new color. i forgot it.'];
+const YUM_LINES = ['nom.', 'crunchy in a soft way.', 'mmm. {s}.', 'that one was loud.', 'tastes like a tuesday.', 'my tummy says thank you.'];
+const YUCK_LINES = ['bleh. {s} tastes like homework.', 'no thank you, {s}.', 'ptoo! {s} is NOT a food.'];
+
+function starShape(R, r, n) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < n * 2; i++) {
+    const a = (i / (n * 2)) * Math.PI * 2 + Math.PI / 2;
+    const rad = i % 2 ? r : R;
+    const x = Math.cos(a) * rad, y = Math.sin(a) * rad;
+    if (i === 0) s.moveTo(x, y); else s.lineTo(x, y);
+  }
+  s.closePath();
+  return s;
+}
+function starGeo(R, r, depth) {
+  const g = new THREE.ExtrudeGeometry(starShape(R, r, 5), { depth, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 2 });
+  g.center();
+  return g;
+}
+function stdMat(color, emissive, flat, emissiveIntensity) {
+  return new THREE.MeshStandardMaterial({
+    color, emissive: emissive === undefined ? 0x000000 : emissive, emissiveIntensity: emissiveIntensity === undefined ? 0.35 : emissiveIntensity,
+    roughness: 0.35, metalness: 0.05, flatShading: !!flat,
+  });
+}
+
+const SNACKS = [
+  { name: 'moon cheese', color: 0xffe08a, build() {
+      const g = new THREE.Group();
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.2, 3), stdMat(0xffe08a, 0x6b5200));
+      g.add(m);
+      for (let i = 0; i < 3; i++) {
+        const h = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), stdMat(0xc9a640));
+        h.position.set(rand(-0.1, 0.1), 0.09, rand(-0.08, 0.08));
+        g.add(h);
+      }
+      return g;
+    } },
+  { name: 'comet noodle', color: 0xff8fc8, build: () => new THREE.Mesh(new THREE.TorusKnotGeometry(0.15, 0.05, 80, 10, 2, 3), stdMat(0xff8fc8, 0x5a1030)) },
+  { name: 'fizzy pebble', color: 0x8ef0cf, build: () => new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), stdMat(0x8ef0cf, 0x0f5040, true)) },
+  { name: 'pickled rainbow', color: 0xb69cff, build() {
+      const g = new THREE.Group();
+      [0xff6b8a, 0xffb36b, 0xffe36b, 0x7de8a0, 0x7ab8ff, 0xb69cff].forEach((c, i) => {
+        g.add(new THREE.Mesh(new THREE.TorusGeometry(0.32 - i * 0.035, 0.019, 6, 24, Math.PI), stdMat(c, c, false, 0.35)));
+      });
+      return g;
+    } },
+  { name: 'star jelly', color: 0xffc36b, build: () => new THREE.Mesh(starGeo(0.24, 0.11, 0.1), stdMat(0xffc36b, 0x7a4a00)) },
+  { name: 'single sock', color: 0x9fd8ff, build() {
+      const g = new THREE.Group();
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.32, 12), stdMat(0x9fd8ff));
+      leg.position.y = 0.1;
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.24, 12), stdMat(0x9fd8ff));
+      foot.rotation.z = Math.PI / 2; foot.position.set(0.08, -0.06, 0);
+      const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.096, 0.096, 0.05, 12), stdMat(0xff7fb8));
+      stripe.position.y = 0.2;
+      g.add(leg, foot, stripe);
+      return g;
+    } },
+  { name: 'cloud bun', color: 0xffffff, build() {
+      const g = new THREE.Group();
+      [[0, 0, 0, 0.16], [0.14, 0.02, 0, 0.12], [-0.14, 0.01, 0, 0.12], [0.05, 0.1, 0, 0.11]].forEach(([x, y, z, r]) => {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), stdMat(0xffffff, 0x334455));
+        m.position.set(x, y, z);
+        g.add(m);
+      });
+      return g;
+    } },
+];
+
+// ---------------------------------------------------------------- state
+const STORE_KEY = 'glimmerblob:v1';
+let S = null;
+
+function newState() {
+  const fav = Math.floor(Math.random() * SNACKS.length);
+  let yuck = Math.floor(Math.random() * SNACKS.length);
+  if (yuck === fav) yuck = (yuck + 3) % SNACKS.length;
+  return {
+    v: 1, phase: 'egg', eggTaps: 0, name: makeName(), hue: Math.random(), hatchedAt: null,
+    stats: { tummy: 62, giggles: 55, shine: 70, pep: 78 },
+    xp: 0, level: 1, fav, yuck, favKnown: false, asleep: false, sound: true, lastTick: Date.now(),
+  };
+}
+function loadState(hotData) {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) { const s = JSON.parse(raw); if (s && s.v === 1 && s.stats) return s; }
+  } catch (e) { /* storage blocked */ }
+  if (hotData && hotData.state && hotData.state.v === 1) return hotData.state;
+  return null;
+}
+function saveState() {
+  if (!S) return;
+  S.lastTick = Date.now();
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* storage blocked */ }
+}
+if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
+  try { window.claude.hot.snapshot(() => ({ state: S })); } catch (e) { /* not available */ }
+}
+
+// ---------------------------------------------------------------- sound
+let actx = null;
+function audio() {
+  if (!S || !S.sound) return null;
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(f0, f1, dur, type, vol, delay) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + (delay || 0);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(f1, 20), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+let noiseBuf = null;
+function noise(dur, vol, freq, delay) {
+  const a = audio(); if (!a) return;
+  if (!noiseBuf) {
+    noiseBuf = a.createBuffer(1, a.sampleRate * 0.5, a.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t = a.currentTime + (delay || 0);
+  const src = a.createBufferSource(); src.buffer = noiseBuf;
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.2;
+  const g = a.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start(t); src.stop(t + dur + 0.02);
+}
+const SFX = {
+  boop() { tone(520, 880, 0.12, 'sine', 0.18); tone(880, 1320, 0.08, 'triangle', 0.05, 0.05); },
+  giggle() { for (let i = 0; i < 4; i++) tone(700 + i * 90 + Math.random() * 60, 1000 + i * 130, 0.07, 'sine', 0.1, i * 0.075); },
+  chomp(d) { noise(0.07, 0.25, 700, d); tone(190, 90, 0.08, 'square', 0.04, d); },
+  pop() { tone(950, 220, 0.09, 'sine', 0.2); noise(0.03, 0.15, 3200); },
+  chime(p) { tone(1100 + p * 70, 1600 + p * 70, 0.16, 'triangle', 0.05); },
+  levelUp() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f * 1.01, 0.2, 'triangle', 0.12, i * 0.08)); },
+  yuck() { tone(320, 120, 0.35, 'sawtooth', 0.05); },
+  sneeze() { tone(400, 1300, 0.22, 'sine', 0.07); noise(0.25, 0.3, 2600, 0.22); },
+  hiccup() { tone(480, 1150, 0.06, 'sine', 0.15); },
+  crack() { noise(0.08, 0.35, 1800); tone(1400, 700, 0.06, 'square', 0.03); },
+  hatch() { noise(0.3, 0.3, 1200); [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.12, 0.1 + i * 0.07)); },
+  yawn() { tone(520, 190, 0.9, 'sine', 0.08); },
+  mumble() { tone(220, 180, 0.22, 'triangle', 0.08); tone(200, 250, 0.22, 'triangle', 0.08, 0.24); },
+  hum() { [392, 440, 392, 523].forEach((f, i) => tone(f, f, 0.22, 'sine', 0.06, i * 0.24)); },
+  spin() { tone(300, 1200, 0.5, 'triangle', 0.06); },
+};
+function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignored */ } }
+
+// ---------------------------------------------------------------- three.js setup
+const canvas = $('#stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x000000, 0);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+const LOOK_Y = 1.45;
+let camDist = 9;
+
+const hemi = new THREE.HemisphereLight(0xcff6ff, 0x30485a, 0.9);
+scene.add(hemi);
+const keyLight = new THREE.DirectionalLight(0xfff0e0, 0.9);
+keyLight.position.set(2, 5, 4);
+scene.add(keyLight);
+const rimLight = new THREE.PointLight(0xff7fb8, 0.7, 12);
+rimLight.position.set(-3, 2.2, -2);
+scene.add(rimLight);
+
+// ---- shaders
+const BODY_VS = `
+uniform float uTime; uniform float uWobble; uniform float uPokeAmt; uniform vec3 uPoke;
+varying vec3 vN; varying vec3 vViewPos; varying vec3 vObj;
+void main(){
+  vec3 p = position;
+  float w = sin(p.y*5.0 + uTime*2.7)*0.5 + sin(p.x*4.0 - uTime*2.1)*0.3 + sin(p.z*6.0 + uTime*3.3)*0.2;
+  p += normal * w * 0.018 * uWobble;
+  float dd = distance(position, uPoke);
+  p -= normal * uPokeAmt * exp(-dd*dd*9.0);
+  vObj = position;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vViewPos = mv.xyz;
+  vN = normalize(normalMatrix * normal);
+  gl_Position = projectionMatrix * mv;
+}`;
+const BODY_FS = `
+uniform float uTime; uniform float uHue; uniform float uSat; uniform float uSleep; uniform float uGloom; uniform float uGlitter;
+varying vec3 vN; varying vec3 vViewPos; varying vec3 vObj;
+float hash(vec3 p){ p = fract(p*0.3183099 + 0.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+vec3 pal(float t){ return 0.62 + 0.38*cos(6.28318*(t + vec3(0.0, 0.33, 0.67))); }
+void main(){
+  vec3 N = normalize(vN); vec3 V = normalize(-vViewPos);
+  float ndv = clamp(dot(N, V), 0.0, 1.0);
+  float fres = pow(1.0 - ndv, 2.2);
+  float t = uHue + vObj.y*0.16 + fres*0.55 + uTime*0.03;
+  vec3 base = mix(pal(t), vec3(1.0, 0.82, 0.92), 0.3);
+  base = mix(base, vec3(0.42, 0.52, 0.68), uGloom*0.6);
+  float g = dot(base, vec3(0.299, 0.587, 0.114));
+  base = mix(vec3(g)*0.85, base, uSat);
+  vec3 L = normalize(vec3(0.35, 0.85, 0.55));
+  float diff = max(dot(N, L), 0.0);
+  vec3 col = base*(0.56 + 0.6*diff);
+  vec3 H = normalize(L + V);
+  col += pow(max(dot(N, H), 0.0), 70.0)*(0.2 + 0.8*uSat)*0.9;
+  col += pal(t + 0.5)*fres*0.55*(0.3 + 0.7*uSat);
+  vec3 q = vObj*16.0; vec3 c = floor(q); vec3 f = fract(q) - 0.5;
+  float h = hash(c);
+  vec3 o = vec3(hash(c + 3.1), hash(c + 7.7), hash(c + 1.9)) - 0.5;
+  float d = length(f - o*0.5);
+  float tw = pow(max(0.0, sin(uTime*2.5 + h*60.0)), 10.0);
+  col += vec3(1.0, 0.95, 1.0)*smoothstep(0.16, 0.0, d)*step(0.55, h)*tw*uGlitter*uSat*1.6;
+  col *= mix(1.0, 0.72, uSleep);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+const POINT_VS = `
+attribute float aSize; attribute float aAlpha; attribute float aPhase; attribute vec3 aColor;
+uniform float uTime; uniform float uScale; uniform float uTwinkle;
+varying vec3 vColor; varying float vAlpha;
+void main(){
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  float tw = 1.0 - uTwinkle + uTwinkle*(0.5 + 0.5*sin(uTime*(1.5 + fract(aPhase*7.13)*2.5) + aPhase*6.2831));
+  vAlpha = aAlpha*tw; vColor = aColor;
+  gl_PointSize = aSize*uScale/max(-mv.z, 0.1)*(0.6 + 0.4*tw);
+  gl_Position = projectionMatrix * mv;
+}`;
+const POINT_FS = `
+varying vec3 vColor; varying float vAlpha;
+void main(){
+  vec2 uv = gl_PointCoord - 0.5;
+  float d = length(uv);
+  float core = pow(max(0.0, 1.0 - d*2.0), 3.0);
+  float rx = max(0.0, 1.0 - abs(uv.x)*14.0)*max(0.0, 1.0 - abs(uv.y)*2.0);
+  float ry = max(0.0, 1.0 - abs(uv.y)*14.0)*max(0.0, 1.0 - abs(uv.x)*2.0);
+  float a = (core + (rx + ry)*0.7)*vAlpha;
+  if (a < 0.01) discard;
+  gl_FragColor = vec4(vColor*a, a);
+}`;
+const BUBBLE_VS = `
+varying vec3 vN; varying vec3 vV;
+void main(){
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vN = normalize(normalMatrix * normal); vV = -mv.xyz;
+  gl_Position = projectionMatrix * mv;
+}`;
+const BUBBLE_FS = `
+uniform float uTime; uniform float uSeed; uniform float uGold; uniform float uFade;
+varying vec3 vN; varying vec3 vV;
+void main(){
+  vec3 N = normalize(vN);
+  float f = pow(1.0 - abs(dot(N, normalize(vV))), 1.6);
+  vec3 col = 0.6 + 0.4*cos(6.2831*(f*1.3 + uTime*0.2 + uSeed + vec3(0.0, 0.33, 0.67)));
+  col = mix(col, vec3(1.0, 0.82, 0.35), uGold*0.75);
+  float spot = smoothstep(0.93, 0.975, dot(N, normalize(vec3(-0.4, 0.55, 0.75))));
+  float a = (f*0.85 + 0.07 + spot)*uFade;
+  gl_FragColor = vec4(col*(0.6 + f) + spot, a);
+}`;
+const ISLAND_FS = `
+uniform float uTime; uniform float uSleep; varying vec2 vUv;
+void main(){
+  vec2 p = vUv - 0.5; float r = length(p)*2.0;
+  vec3 col = mix(vec3(0.5, 0.92, 0.8), vec3(0.13, 0.4, 0.48), smoothstep(0.0, 1.0, r));
+  col += smoothstep(0.03, 0.0, abs(fract(r*4.0 - uTime*0.08) - 0.5) - 0.465)*0.06;
+  vec2 gcell = floor(vUv*60.0);
+  float h = fract(sin(dot(gcell, vec2(12.9898, 78.233)))*43758.5453);
+  col += step(0.93, h)*pow(max(0.0, sin(uTime*2.0 + h*50.0)), 12.0)*0.8;
+  col *= mix(1.0, 0.5, uSleep);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+// ---- sparkle particles
+function makePoints(n, twinkle) {
+  const geo = new THREE.BufferGeometry();
+  const attrs = {
+    position: new Float32Array(n * 3), aColor: new Float32Array(n * 3),
+    aSize: new Float32Array(n), aAlpha: new Float32Array(n), aPhase: new Float32Array(n),
+  };
+  geo.setAttribute('position', new THREE.BufferAttribute(attrs.position, 3));
+  geo.setAttribute('aColor', new THREE.BufferAttribute(attrs.aColor, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(attrs.aSize, 1));
+  geo.setAttribute('aAlpha', new THREE.BufferAttribute(attrs.aAlpha, 1));
+  geo.setAttribute('aPhase', new THREE.BufferAttribute(attrs.aPhase, 1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: pointUniforms.uTime, uScale: pointUniforms.uScale, uTwinkle: { value: twinkle } },
+    vertexShader: POINT_VS, fragmentShader: POINT_FS,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  return { pts, geo, attrs, n };
+}
+const pointUniforms = { uTime: { value: 0 }, uScale: { value: 500 } };
+const tmpColor = new THREE.Color();
+
+const field = makePoints(240, reduceMotion ? 0.3 : 1);
+for (let i = 0; i < field.n; i++) {
+  const back = i < 200;
+  field.attrs.position.set([rand(-10, 10), rand(-4, 10), back ? rand(-12, -2) : rand(-1, 3)], i * 3);
+  tmpColor.setHex(pick(SPARK_COLORS));
+  field.attrs.aColor.set([tmpColor.r, tmpColor.g, tmpColor.b], i * 3);
+  field.attrs.aSize[i] = back ? rand(0.12, 0.3) : rand(0.04, 0.09);
+  field.attrs.aAlpha[i] = back ? rand(0.35, 0.9) : rand(0.3, 0.6);
+  field.attrs.aPhase[i] = Math.random() * 10;
+}
+scene.add(field.pts);
+
+const sparks = makePoints(700, 0.35);
+sparks.vel = new Float32Array(sparks.n * 3);
+sparks.life = new Float32Array(sparks.n);
+sparks.max = new Float32Array(sparks.n);
+sparks.grav = new Float32Array(sparks.n);
+sparks.drag = new Float32Array(sparks.n);
+sparks.base = new Float32Array(sparks.n);
+sparks.cursor = 0;
+scene.add(sparks.pts);
+const tmpDir = new V3();
+function emit(pos, count, o) {
+  o = o || {};
+  const speed = o.speed === undefined ? 2 : o.speed;
+  const colors = o.colors || SPARK_COLORS;
+  for (let k = 0; k < count; k++) {
+    const i = sparks.cursor; sparks.cursor = (sparks.cursor + 1) % sparks.n;
+    const spread = o.spread === undefined ? 0.05 : o.spread;
+    sparks.attrs.position.set([pos.x + rand(-spread, spread), pos.y + rand(-spread, spread), pos.z + rand(-spread, spread)], i * 3);
+    tmpDir.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(speed * rand(0.35, 1));
+    if (o.dir) tmpDir.addScaledVector(o.dir, rand(0.6, 1.2));
+    tmpDir.y += o.up === undefined ? 1 : o.up;
+    sparks.vel.set([tmpDir.x, tmpDir.y, tmpDir.z], i * 3);
+    tmpColor.setHex(pick(colors));
+    sparks.attrs.aColor.set([tmpColor.r, tmpColor.g, tmpColor.b], i * 3);
+    const size = o.size || [0.07, 0.17];
+    sparks.base[i] = rand(size[0], size[1]);
+    const life = o.life || [0.6, 1.2];
+    sparks.life[i] = sparks.max[i] = rand(life[0], life[1]);
+    sparks.grav[i] = o.gravity === undefined ? 2.2 : o.gravity;
+    sparks.drag[i] = o.drag === undefined ? 1.6 : o.drag;
+    sparks.attrs.aPhase[i] = Math.random() * 10;
+  }
+}
+function updateSparks(dt) {
+  const P = sparks.attrs.position, vel = sparks.vel;
+  for (let i = 0; i < sparks.n; i++) {
+    if (sparks.life[i] <= 0) { sparks.attrs.aAlpha[i] = 0; sparks.attrs.aSize[i] = 0; continue; }
+    sparks.life[i] -= dt;
+    const j = i * 3;
+    const damp = Math.max(0, 1 - sparks.drag[i] * dt);
+    vel[j] *= damp; vel[j + 1] = vel[j + 1] * damp - sparks.grav[i] * dt; vel[j + 2] *= damp;
+    P[j] += vel[j] * dt; P[j + 1] += vel[j + 1] * dt; P[j + 2] += vel[j + 2] * dt;
+    const k = sparks.life[i] / sparks.max[i];
+    const fadeIn = Math.min(1, (1 - k) * 8);
+    sparks.attrs.aAlpha[i] = Math.max(0, k) * fadeIn;
+    sparks.attrs.aSize[i] = sparks.base[i] * (0.5 + 0.5 * k) * fadeIn;
+  }
+  ['position', 'aAlpha', 'aSize', 'aColor', 'aPhase'].forEach((a) => { sparks.geo.attributes[a].needsUpdate = true; });
+}
+function updateField(dt) {
+  const P = field.attrs.position;
+  const drift = reduceMotion ? 0.03 : 0.12;
+  for (let i = 0; i < field.n; i++) {
+    P[i * 3 + 1] += drift * dt * (0.5 + (i % 5) * 0.2);
+    if (P[i * 3 + 1] > 10) P[i * 3 + 1] = -4;
+  }
+  field.geo.attributes.position.needsUpdate = true;
+}
+
+// ---- island
+const island = new THREE.Group();
+scene.add(island);
+const islandUniforms = { uTime: pointUniforms.uTime, uSleep: { value: 0 } };
+const islandTop = new THREE.Mesh(new THREE.CircleGeometry(2.1, 64), new THREE.ShaderMaterial({
+  uniforms: islandUniforms,
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: ISLAND_FS,
+}));
+islandTop.rotation.x = -Math.PI / 2;
+islandTop.position.y = 0.001;
+island.add(islandTop);
+const rim = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 1.75, 0.38, 64, 1, true), stdMat(0x2b7f86, 0x0b3540, false, 0.6));
+rim.position.y = -0.19;
+island.add(rim);
+const rockMat = stdMat(0x23566a, 0x0a2230, true, 0.6);
+const under = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 0.25, 1.5, 9), rockMat);
+under.position.y = -1.13;
+island.add(under);
+for (let i = 0; i < 5; i++) {
+  const a = (i / 5) * Math.PI * 2 + 0.4;
+  const c = new THREE.Mesh(new THREE.ConeGeometry(rand(0.2, 0.35), rand(0.6, 1.0), 6), rockMat);
+  c.rotation.x = Math.PI;
+  c.position.set(Math.cos(a) * 1.1, -1.1, Math.sin(a) * 1.1);
+  island.add(c);
+}
+const crystalCols = [0xff86bd, 0x8ef0cf, 0xb9a4ff, 0xffe38a, 0x9fd8ff];
+const crystals = [];
+for (let i = 0; i < 11; i++) {
+  let a;
+  do { a = rand(0, Math.PI * 2); } while (Math.abs(Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2))) < 0.55);
+  const col = pick(crystalCols);
+  const c = new THREE.Mesh(new THREE.ConeGeometry(rand(0.08, 0.14), rand(0.3, 0.6), 5), new THREE.MeshStandardMaterial({
+    color: col, emissive: col, emissiveIntensity: 0.45, roughness: 0.15, metalness: 0.1, flatShading: true,
+  }));
+  const r = rand(1.45, 1.95);
+  c.position.set(Math.cos(a) * r, 0.12, Math.sin(a) * r);
+  c.rotation.set(rand(-0.35, 0.35), rand(0, 6), rand(-0.35, 0.35));
+  c.userData.phase = Math.random() * 6;
+  island.add(c);
+  crystals.push(c);
+}
+function shadowTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(4,16,24,0.85)'); grd.addColorStop(0.55, 'rgba(4,16,24,0.35)'); grd.addColorStop(1, 'rgba(4,16,24,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false, opacity: 0.6 }));
+shadow.rotation.x = -Math.PI / 2;
+shadow.position.y = 0.01;
+scene.add(shadow);
+
+// ---------------------------------------------------------------- the creature
+const bodyUniforms = {
+  uTime: pointUniforms.uTime, uHue: { value: 0 }, uSat: { value: 1 }, uSleep: { value: 0 }, uGloom: { value: 0 },
+  uGlitter: { value: 1 }, uWobble: { value: 1 }, uPoke: { value: new V3(9, 9, 9) }, uPokeAmt: { value: 0 },
+};
+const bodyMat = new THREE.ShaderMaterial({ uniforms: bodyUniforms, vertexShader: BODY_VS, fragmentShader: BODY_FS });
+const partMat = new THREE.ShaderMaterial({ uniforms: Object.assign({}, bodyUniforms, { uPokeAmt: { value: 0 } }), vertexShader: BODY_VS, fragmentShader: BODY_FS });
+
+const pet = new THREE.Group();
+scene.add(pet);
+const rig = new THREE.Group();
+pet.add(rig);
+const BODY_C = new V3(0, 1, 0);
+const body = new THREE.Mesh(new THREE.SphereGeometry(1, 72, 54), bodyMat);
+body.position.copy(BODY_C);
+rig.add(body);
+
+function surf(theta, phi, r) {
+  return new V3(Math.sin(theta) * Math.cos(phi), Math.sin(phi), Math.cos(theta) * Math.cos(phi)).multiplyScalar(r).add(BODY_C);
+}
+function placeOut(obj, theta, phi, r) {
+  obj.position.copy(surf(theta, phi, r));
+  obj.lookAt(surf(theta, phi, r + 1));
+}
+
+// googly eyes, deliberately mismatched
+const eyes = [];
+function makeEye(theta, phi, R, dir) {
+  const g = new THREE.Group();
+  placeOut(g, theta, phi, 1 - R * 0.28);
+  const lid = new THREE.Group(); g.add(lid);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(R, 32, 24), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, emissive: 0x333333 }));
+  white.scale.z = 0.75; lid.add(white);
+  const pupil = new THREE.Group(); lid.add(pupil);
+  const pm = new THREE.Mesh(new THREE.SphereGeometry(R * 0.48, 24, 16), new THREE.MeshStandardMaterial({ color: 0x15101f, roughness: 0.15 }));
+  pm.scale.z = 0.45; pupil.add(pm);
+  const glint = new THREE.Mesh(new THREE.SphereGeometry(R * 0.13, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  glint.position.set(R * 0.15, R * 0.17, R * 0.2); pupil.add(glint);
+  rig.add(g);
+  const e = { g, lid, pupil, R, dir, p: new THREE.Vector2(), v: new THREE.Vector2(), lidV: 1, blinkT: -1 };
+  eyes.push(e);
+  return e;
+}
+makeEye(-0.36, 0.22, 0.3, 1);
+makeEye(0.37, 0.27, 0.235, -1);
+
+const inkMat = new THREE.MeshBasicMaterial({ color: 0x2a1630 });
+const mouth = new THREE.Group();
+placeOut(mouth, 0, -0.21, 1.012);
+rig.add(mouth);
+const smile = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.032, 10, 32, Math.PI), inkMat);
+smile.rotation.z = Math.PI;
+mouth.add(smile);
+const oMouth = new THREE.Group();
+const oIn = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 12), new THREE.MeshBasicMaterial({ color: 0x3a0f2a }));
+oIn.scale.z = 0.3;
+const tongue = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 10), new THREE.MeshBasicMaterial({ color: 0xff6f9f }));
+tongue.position.set(0, -0.06, 0.02); tongue.scale.set(1.2, 0.6, 0.4);
+oMouth.add(oIn, tongue);
+mouth.add(oMouth);
+
+const cheeks = [-1, 1].map((s) => {
+  const m = new THREE.Mesh(new THREE.CircleGeometry(0.13, 24), new THREE.MeshBasicMaterial({ color: 0xff6fa8, transparent: true, opacity: 0.4, depthWrite: false }));
+  placeOut(m, s * 0.62, -0.1, 1.028);
+  rig.add(m);
+  return m;
+});
+
+function makeArm(side) {
+  const pivot = new THREE.Group();
+  pivot.position.copy(surf(side * 1.5, -0.12, 0.9));
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 16), partMat);
+  m.scale.set(0.62, 1, 0.62);
+  m.position.set(side * 0.2, -0.04, 0);
+  m.rotation.z = side * -0.6;
+  pivot.add(m);
+  rig.add(pivot);
+  return pivot;
+}
+const arms = { L: makeArm(-1), R: makeArm(1) };
+[-1, 1].forEach((s) => {
+  const f = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 14), partMat);
+  f.scale.set(1, 0.55, 1.35);
+  f.position.set(s * 0.42, 0.12, 0.32);
+  rig.add(f);
+});
+
+const antenna = new THREE.Group();
+antenna.position.set(0, 1.96, 0);
+rig.add(antenna);
+const stalkCurve = new THREE.CatmullRomCurve3([new V3(0, -0.05, 0), new V3(0.02, 0.22, 0), new V3(0.14, 0.45, 0.02), new V3(0.1, 0.66, 0)]);
+antenna.add(new THREE.Mesh(new THREE.TubeGeometry(stalkCurve, 24, 0.032, 8, false), partMat));
+const starMat = new THREE.MeshStandardMaterial({ color: 0xffe38a, emissive: 0xffc94a, emissiveIntensity: 0.9, roughness: 0.3 });
+const star = new THREE.Mesh(starGeo(0.17, 0.075, 0.06), starMat);
+star.position.set(0.1, 0.72, 0);
+antenna.add(star);
+const starLight = new THREE.PointLight(0xffd27a, 0.8, 4);
+starLight.position.copy(star.position);
+antenna.add(starLight);
+
+// level trinkets: moonlets (Lv2+), party hat (Lv3+), halo (Lv5+)
+const moonlets = [];
+for (let i = 0; i < 6; i++) {
+  const c = SPARK_COLORS[i];
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 12), new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.6, roughness: 0.3 }));
+  m.userData = { r: 1.45 + (i % 2) * 0.22, speed: (0.7 + i * 0.17) * (i % 2 ? -1 : 1), phase: i * 1.3, tilt: rand(-0.45, 0.45) };
+  m.visible = false;
+  pet.add(m);
+  moonlets.push(m);
+}
+const hat = new THREE.Group();
+const cone = new THREE.Mesh(new THREE.ConeGeometry(0.27, 0.55, 24), stdMat(0xff86bd, 0x60123a));
+cone.position.y = 0.27;
+const pom = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), stdMat(0xffe38a, 0x6a5000));
+pom.position.y = 0.57;
+const band = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.035, 8, 28), stdMat(0x8ef0cf, 0x0f5040));
+band.rotation.x = Math.PI / 2; band.position.y = 0.04;
+hat.add(cone, pom, band);
+hat.position.copy(surf(-0.5, 0.92, 0.93));
+hat.rotation.z = 0.5;
+hat.visible = false;
+rig.add(hat);
+const halo = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.035, 12, 48), new THREE.MeshStandardMaterial({ color: 0xffe38a, emissive: 0xffd060, emissiveIntensity: 0.9 }));
+halo.rotation.x = Math.PI / 2;
+halo.position.y = 2.42;
+halo.visible = false;
+rig.add(halo);
+
+// grumpy little raincloud for gloomy moods
+const cloud = new THREE.Group();
+const cloudMat = stdMat(0x8d97a8, 0x1a2230);
+[[0, 0, 0, 0.32], [0.3, -0.05, 0, 0.24], [-0.3, -0.04, 0, 0.26], [0.1, 0.18, 0, 0.22]].forEach(([x, y, z, r]) => {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), cloudMat);
+  m.position.set(x, y, z);
+  cloud.add(m);
+});
+cloud.position.set(0.35, 3.25, 0.2);
+cloud.scale.setScalar(0.001);
+pet.add(cloud);
+
+// ---- egg
+const eggUniforms = Object.assign({}, bodyUniforms, { uHue: { value: 0 }, uSat: { value: 1 }, uGloom: { value: 0 }, uSleep: { value: 0 }, uPokeAmt: { value: 0 }, uGlitter: { value: 1.6 } });
+const eggPivot = new THREE.Group();
+scene.add(eggPivot);
+const egg = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), new THREE.ShaderMaterial({ uniforms: eggUniforms, vertexShader: BODY_VS, fragmentShader: BODY_FS }));
+egg.scale.set(0.82, 1.05, 0.82);
+egg.position.y = 1.05;
+eggPivot.add(egg);
+const eggSpots = [];
+for (let i = 0; i < 9; i++) {
+  const th = rand(-1.2, 1.2), ph = rand(-0.7, 0.9);
+  const s = new THREE.Mesh(new THREE.CircleGeometry(rand(0.07, 0.13), 20), new THREE.MeshBasicMaterial({ color: pick([0xffffff, 0xffe38a, 0xff86bd]), transparent: true, opacity: 0.75, depthWrite: false }));
+  const dir = new V3(Math.sin(th) * Math.cos(ph), Math.sin(ph), Math.cos(th) * Math.cos(ph));
+  s.position.set(dir.x * 0.83, 1.05 + dir.y * 1.06, dir.z * 0.83);
+  s.lookAt(s.position.clone().add(dir));
+  eggPivot.add(s);
+  eggSpots.push(s);
+}
+
+// ---------------------------------------------------------------- animation state
+const A = {
+  t: 0, hopT: -1, hopH: 0, hopDur: 0.5, squash: 0, squashV: 0,
+  spinT: -1, shakeT: 0, dizzyT: 0, sneezeT: -1, hiccupT: 0, nextHic: 0,
+  cheerT: 0, rubT: 0, waveT: 0, chompT: 0,
+  nextBlink: 2, mouthOpen: 0, mouthOpenTarget: 0, smile: 0.6,
+  lookTarget: new V3(0, 1.5, 6), idleLook: new V3(0, 1.5, 6), nextIdleLook: 1,
+  nextQuirk: 9, antA: 0, antV: 0, blush: 0, hueShift: 0, hatchPop: 1,
+  eggWob: 0, eggWobV: 0, cloudS: 0, sleepK: 0,
+};
+function hop(h, dur) {
+  if (A.hopT >= 0) return;
+  A.hopT = 0; A.hopH = h; A.hopDur = dur;
+  A.squashV -= 3 + h * 4;
+  A.antV += 2;
+}
+function kickPupils(s) {
+  eyes.forEach((e) => { e.v.x += rand(-1, 1) * s; e.v.y += rand(-1, 1) * s; });
+}
+
+// ---------------------------------------------------------------- DOM refs + UI helpers
+const speechEl = $('#speech');
+const hintEl = $('#hint');
+const statEls = {};
+STAT_KEYS.forEach((k) => {
+  const root = document.querySelector('.stat[data-stat="' + k + '"]');
+  statEls[k] = { root, fill: root.querySelector('.fill') };
+});
+const nameEl = $('#petName');
+const btn = { snack: $('#btnSnack'), play: $('#btnPlay'), polish: $('#btnPolish'), nap: $('#btnNap') };
+
+let speechT = 0;
+function say(text, secs) {
+  speechEl.textContent = text;
+  speechEl.classList.add('show');
+  speechT = secs || Math.max(2.6, text.length * 0.07);
+}
+let hintT = 0;
+function hint(text, secs) {
+  hintEl.querySelector('span').textContent = text;
+  hintEl.classList.add('show');
+  hintT = secs || 4;
+}
+const tmpV = new V3(), tmpV2 = new V3();
+function toScreen(v) {
+  tmpV2.copy(v).project(camera);
+  return { x: (tmpV2.x + 1) / 2 * window.innerWidth, y: (1 - tmpV2.y) / 2 * window.innerHeight };
+}
+function headWorld(y) { return pet.localToWorld(tmpV.set(0, y === undefined ? 2.6 : y, 0)); }
+function floatText(text, color, worldPos, cls) {
+  const p = toScreen(worldPos || headWorld());
+  const el = document.createElement('div');
+  el.className = 'floater' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+  el.style.left = (p.x + rand(-30, 30)) + 'px';
+  el.style.top = (p.y + rand(-10, 10)) + 'px';
+  if (color) el.style.setProperty('--c', color);
+  el.addEventListener('animationend', () => el.remove());
+  document.body.appendChild(el);
+}
+function bump(stat, n, quiet) {
+  const before = S.stats[stat];
+  S.stats[stat] = clamp(before + n, 0, 100);
+  const d = Math.round(S.stats[stat] - before);
+  if (!quiet && d !== 0) floatText((d > 0 ? '+' : '') + d + ' ' + STAT_LABEL[stat], STAT_COLOR[stat]);
+}
+function moodScore() {
+  const s = S.stats;
+  const avg = (s.tummy + s.giggles + s.shine + s.pep) / 4;
+  const min = Math.min(s.tummy, s.giggles, s.shine, s.pep);
+  return avg * 0.6 + min * 0.4;
+}
+function moodWord() {
+  if (S.asleep) return 'snoozing';
+  const m = moodScore();
+  return m > 80 ? 'radiant' : m > 60 ? 'bubbly' : m > 40 ? 'okay-ish' : m > 22 ? 'grumbly' : 'gloomy';
+}
+function moons() { return S.hatchedAt ? Math.floor((Date.now() - S.hatchedAt) / 86400000) : 0; }
+function addXP(n) {
+  S.xp += n;
+  while (S.xp >= 20 * S.level) {
+    S.xp -= 20 * S.level;
+    S.level += 1;
+    levelUp();
+  }
+}
+function levelUp() {
+  SFX.levelUp(); buzz(30);
+  A.cheerT = 2; A.hueShift += 0.35;
+  hop(0.7, 0.6);
+  emit(headWorld(1.4), 90, { speed: 4.5, up: 2, size: [0.1, 0.24], life: [0.9, 1.6] });
+  const unlock = S.level === 2 ? ' i got a moon!' : S.level === 3 ? ' i got a HAT.' : S.level === 5 ? ' i have a halo now. be cool.' : S.level <= 7 ? ' another moon!' : '';
+  setTimeout(() => say('LEVEL ' + S.level + '! i feel… shinier.' + unlock, 3.6), 300);
+  floatText('Lv ' + S.level, '#ffe38a');
+  applyTrinkets();
+}
+function applyTrinkets() {
+  const n = clamp(S.level - 1, 0, 6);
+  moonlets.forEach((m, i) => { m.visible = i < n; });
+  hat.visible = S.level >= 3;
+  halo.visible = S.level >= 5;
+}
+
+// ---------------------------------------------------------------- actions
+let snack = null;
+function feed() {
+  if (S.asleep) { say('zzz… snack… later…'); SFX.mumble(); return; }
+  if (snack) return;
+  const idx = Math.floor(Math.random() * SNACKS.length);
+  const def = SNACKS[idx];
+  const mesh = def.build();
+  const from = new V3(rand(-1.3, 1.3), 4.6, 1.4);
+  mesh.position.copy(from);
+  mesh.scale.setScalar(0.01);
+  scene.add(mesh);
+  snack = { mesh, def, idx, t: 0, from, phase: 'fly', vel: new V3(), age: 0 };
+  A.mouthOpenTarget = 0.9;
+  say('a ' + def.name + '!', 1.1);
+}
+const mouthWorld = new V3();
+function updateSnack(dt) {
+  if (!snack) return;
+  const m = snack.mesh;
+  snack.age += dt;
+  if (snack.phase === 'fly') {
+    snack.t = Math.min(1, snack.t + dt / 1.0);
+    mouth.getWorldPosition(mouthWorld);
+    mouthWorld.z += 0.12;
+    const k = ease(snack.t);
+    m.position.lerpVectors(snack.from, mouthWorld, k);
+    m.position.y += Math.sin(k * Math.PI) * 0.6;
+    m.rotation.x += dt * 4; m.rotation.y += dt * 5;
+    m.scale.setScalar(Math.min(1, snack.t * 4) * (1 - Math.max(0, k - 0.8) * 2.5));
+    if (snack.t >= 1) arriveSnack();
+  } else {
+    snack.vel.y -= 9 * dt;
+    m.position.addScaledVector(snack.vel, dt);
+    m.rotation.z += dt * 9;
+    m.scale.setScalar(Math.max(0.01, 1 - snack.age / 1.3));
+    if (snack.age > 1.3) { scene.remove(m); snack = null; }
+  }
+}
+function fill(s, name) { return s.replace('{s}', name); }
+function arriveSnack() {
+  const def = snack.def;
+  A.mouthOpenTarget = 0;
+  mouth.getWorldPosition(mouthWorld);
+  if (snack.idx === S.yuck) {
+    snack.phase = 'spit'; snack.age = 0;
+    snack.mesh.scale.setScalar(0.8);
+    snack.vel.set(Math.random() < 0.5 ? -2.4 : 2.4, 3.2, 2.2);
+    A.shakeT = 0.9;
+    SFX.yuck(); buzz(20);
+    bump('tummy', 3); bump('giggles', -5);
+    say(fill(pick(YUCK_LINES), def.name));
+    addXP(1);
+    return;
+  }
+  scene.remove(snack.mesh);
+  snack = null;
+  const overfed = S.stats.tummy > 86;
+  A.chompT = 1.0;
+  SFX.chomp(0); SFX.chomp(0.2); SFX.chomp(0.4);
+  kickPupils(1.5);
+  emit(mouthWorld, 26, { speed: 2.2, up: 1.2, colors: [def.color, 0xffffff, 0xffe38a] });
+  bump('tummy', 22);
+  bump('shine', -2, true);
+  if (SNACKS[S.fav] === def) {
+    bump('giggles', 15);
+    A.cheerT = 1.8;
+    setTimeout(() => {
+      say(S.favKnown ? def.name + '!! you remembered!' : def.name.toUpperCase() + '?! my favorite!!', 3);
+      S.favKnown = true;
+      for (let i = 0; i < 4; i++) setTimeout(() => floatText('♥', '#ff86bd'), i * 120);
+      SFX.giggle();
+    }, 900);
+    addXP(5);
+  } else {
+    setTimeout(() => say(fill(pick(YUM_LINES), def.name)), 900);
+    addXP(3);
+  }
+  if (overfed) {
+    A.hiccupT = 7; A.nextHic = 1.3;
+    setTimeout(() => say('hic! too many snacks. hic!'), 2400);
+  }
+}
+
+// bubbles mini-game
+const bubbles = [];
+let round = null;
+const bubbleGeo = new THREE.SphereGeometry(1, 32, 24);
+function startBubbles() {
+  if (S.asleep) { say('zzz… bubbles… in my dreams…'); SFX.mumble(); return; }
+  if (round) return;
+  if (S.stats.pep < 10) { say('too sleepy to bubble.'); return; }
+  round = { left: 6, popped: 0, total: 6, next: 0 };
+  hint('Tap the bubbles before they float away', 3.5);
+  say('bubbles!! get them!!', 2);
+  A.cheerT = 0.8;
+}
+function spawnBubble() {
+  const gold = Math.random() < 0.18;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: pointUniforms.uTime, uSeed: { value: Math.random() }, uGold: { value: gold ? 1 : 0 }, uFade: { value: 0 } },
+    vertexShader: BUBBLE_VS, fragmentShader: BUBBLE_FS, transparent: true, depthWrite: false,
+  });
+  const m = new THREE.Mesh(bubbleGeo, mat);
+  const r = gold ? 0.3 : rand(0.32, 0.46);
+  const side = Math.random() < 0.5 ? -1 : 1;
+  m.position.set(side * rand(0.55, 1.25), rand(0.2, 1.4), rand(1.0, 1.6));
+  m.scale.setScalar(r);
+  scene.add(m);
+  bubbles.push({ m, r, gold, age: 0, life: rand(7, 9), wob: Math.random() * 6 });
+}
+function updateBubbles(dt) {
+  if (round && round.left > 0) {
+    round.next -= dt;
+    if (round.next <= 0) { spawnBubble(); round.left -= 1; round.next = rand(0.35, 0.8); }
+  }
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    b.age += dt;
+    b.m.position.y += 0.32 * dt;
+    b.m.position.x += Math.sin(b.age * 1.4 + b.wob) * 0.25 * dt;
+    const s = b.r * (1 + Math.sin(b.age * 3 + b.wob) * 0.04);
+    b.m.scale.set(s, s * (1 - Math.sin(b.age * 3 + b.wob) * 0.04), s);
+    const fadeOut = clamp((b.life - b.age) / 0.6, 0, 1);
+    b.m.material.uniforms.uFade.value = Math.min(1, b.age * 3) * fadeOut;
+    if (b.age >= b.life || b.m.position.y > 4.6) removeBubble(i);
+  }
+  if (round && round.left === 0 && bubbles.length === 0) endRound();
+}
+function removeBubble(i) {
+  const b = bubbles[i];
+  scene.remove(b.m);
+  b.m.material.dispose();
+  bubbles.splice(i, 1);
+}
+function popBubble(i) {
+  const b = bubbles[i];
+  SFX.pop(); buzz(12);
+  emit(b.m.position, b.gold ? 40 : 22, { speed: 3, up: 0.6, gravity: 1.2, colors: b.gold ? [0xffe38a, 0xffffff, 0xffb48c] : [0x8ef0cf, 0xff86bd, 0xb9a4ff, 0xffffff] });
+  bump('giggles', b.gold ? 10 : 5, true);
+  bump('pep', -1.5, true);
+  if (b.gold) { bump('shine', 5, true); floatText('golden!', '#ffe38a', b.m.position); }
+  else floatText('+5', '#ff86bd', b.m.position);
+  addXP(b.gold ? 3 : 1);
+  if (round) round.popped += 1;
+  A.cheerT = Math.max(A.cheerT, 0.7);
+  hop(0.35, 0.4);
+  removeBubble(i);
+}
+function endRound() {
+  const r = round; round = null;
+  if (r.popped === r.total) {
+    bump('giggles', 6);
+    addXP(3);
+    say('PERFECT! again! again!');
+    A.spinT = 0; SFX.spin();
+  } else if (r.popped === 0) {
+    say('the bubbles got away. it was beautiful though.');
+  } else {
+    say(r.popped + (r.popped === 1 ? ' bubble! ' : ' bubbles! ') + pick(['good game.', 'my heart is fizzy.', 'again later?']));
+  }
+}
+
+let polishReady = true;
+function spaPolish() {
+  if (S.asleep) { say('mmh… polish me in the morning…'); SFX.mumble(); return; }
+  if (!polishReady) return;
+  polishReady = false;
+  btn.polish.disabled = true;
+  setTimeout(() => { polishReady = true; refreshButtons(); }, 12000);
+  A.spinT = 0; SFX.spin();
+  A.rubT = 1.2;
+  for (let i = 0; i < 12; i++) setTimeout(() => SFX.chime(i % 6), i * 70);
+  emit(headWorld(1.2), 70, { speed: 2.4, up: 0.5, gravity: -0.4, spread: 0.8, colors: [0x8ef0cf, 0xffffff, 0xb9a4ff], life: [1, 1.8] });
+  bump('shine', 10);
+  addXP(2);
+  const full = S.stats.shine > 97;
+  setTimeout(() => say(full ? "i'm basically a disco ball now." : 'squeaky! rub me with your finger for extra shine.'), 700);
+}
+
+function sleep() {
+  if (S.asleep) return;
+  if (S.stats.pep > 92) { say("not sleepy. i'm a wide-awake blob."); return; }
+  S.asleep = true;
+  SFX.yawn();
+  say('nighty night…', 2);
+  A.mouthOpenTarget = 0;
+  refreshButtons();
+  document.body.classList.add('night');
+}
+function wake(auto) {
+  if (!S.asleep) return;
+  S.asleep = false;
+  document.body.classList.remove('night');
+  refreshButtons();
+  hop(0.5, 0.5);
+  if (auto) { addXP(2); setTimeout(() => say(pick(DREAM_LINES)), 500); }
+  else say(pick(['wha—? i was awake. totally.', 'five more moons…', 'ok ok i am up.']));
+}
+
+function boop(point) {
+  if (S.asleep) {
+    say(pick(['mmf… five more moons…', 'zz… not now, sock…', 'snrk.']));
+    SFX.mumble();
+    A.squashV += 3;
+    return;
+  }
+  SFX.boop();
+  if (Math.random() < 0.5) SFX.giggle();
+  buzz(10);
+  A.squashV += 5.5;
+  A.blush = 0.4;
+  A.antV += rand(-5, 5);
+  kickPupils(2);
+  body.worldToLocal(tmpV.copy(point));
+  bodyUniforms.uPoke.value.copy(tmpV);
+  bodyUniforms.uPokeAmt.value = 0.2;
+  emit(point, 16, { speed: 2.2, up: 1 });
+  bump('giggles', 2, true);
+  addXP(0.5);
+  const now = performance.now();
+  boopTimes.push(now);
+  while (boopTimes.length && now - boopTimes[0] > 3000) boopTimes.shift();
+  if (boopTimes.length >= 7) {
+    boopTimes.length = 0;
+    A.dizzyT = 2.8;
+    say('whoa. the room is boopy.');
+  } else if (Math.random() < 0.3) say(pick(BOOP_LINES), 1.8);
+}
+const boopTimes = [];
+
+let rubAccum = 0, lastChime = 0, chimeStep = 0, discoSaid = false;
+function rub(point, dist) {
+  if (S.asleep) return;
+  A.rubT = 0.35;
+  rubAccum += dist;
+  if (rubAccum > 38) {
+    rubAccum = 0;
+    const before = S.stats.shine;
+    bump('shine', 1, true);
+    if (S.stats.shine > before) addXP(0.25);
+    emit(point, 4, { speed: 1.2, up: 0.8, gravity: 0.3, colors: [0x8ef0cf, 0xffffff, 0xb9a4ff, 0xffe38a] });
+    const now = performance.now();
+    if (now - lastChime > 110) { lastChime = now; SFX.chime(chimeStep++ % 8); }
+    if (S.stats.shine >= 99.5 && !discoSaid) { discoSaid = true; say("i'm already a disco ball. keep going though."); }
+    if (S.stats.shine < 90) discoSaid = false;
+  }
+}
+
+function sneeze() { A.sneezeT = 0; }
+function doQuirk() {
+  const s = S.stats;
+  const needs = STAT_KEYS.filter((k) => s[k] < 30);
+  if (needs.length && Math.random() < 0.65) { say(pick(NEED_LINES[pick(needs)])); return; }
+  const r = Math.random();
+  if (r < 0.34) say(pick(IDLE_LINES));
+  else if (r < 0.52) hop(0.45, 0.45);
+  else if (r < 0.64) { A.spinT = 0; SFX.spin(); }
+  else if (r < 0.78) sneeze();
+  else if (r < 0.9) { A.waveT = 1.6; say(pick(['hi hello.', '*waves aggressively*', 'wave back. it is the law.'])); }
+  else { SFX.hum(); say('♪ hmm hm hmmm ♪', 2); }
+}
+
+// ---------------------------------------------------------------- egg + hatching
+function crackEgg() {
+  if (S.phase !== 'egg') return;
+  S.eggTaps += 1;
+  SFX.crack(); buzz(15);
+  A.eggWobV += (S.eggTaps % 2 ? 1 : -1) * 6;
+  emit(new V3(0, 1.2 + rand(-0.4, 0.5), 0.8), 18 + S.eggTaps * 8, { speed: 2.5, up: 1 });
+  if (S.eggTaps >= 3) { hintEl.classList.remove('show'); hintT = 0; setTimeout(hatch, 250); }
+  else hint(S.eggTaps === 1 ? 'Something wiggled. Tap again.' : 'Almost there…', 9999);
+  saveState();
+}
+function hatch() {
+  if (S.phase !== 'egg') return;
+  S.phase = 'pet';
+  S.hatchedAt = Date.now();
+  SFX.hatch(); buzz(40);
+  emit(new V3(0, 1.1, 0.3), 160, { speed: 5, up: 1.5, size: [0.1, 0.26], life: [1, 2], spread: 0.5 });
+  A.hatchPop = 0;
+  applyPhase();
+  say("hi! i'm " + S.name + '.', 3);
+  setTimeout(() => hint('Boop it. Rub it to polish. Feed it weird things.', 5), 3200);
+  saveState();
+}
+function applyPhase() {
+  const isEgg = S.phase === 'egg';
+  document.body.classList.toggle('egg', isEgg);
+  eggPivot.visible = isEgg;
+  pet.visible = !isEgg;
+  shadow.visible = true;
+  nameEl.value = S.name;
+  bodyUniforms.uHue.value = S.hue;
+  eggUniforms.uHue.value = S.hue + 0.5;
+  document.body.classList.toggle('night', !isEgg && S.asleep);
+  if (isEgg) hint(S.eggTaps ? 'Keep tapping the egg' : 'Tap the egg to hatch it', 9999);
+  applyTrinkets();
+  refreshButtons();
+  renderHUD();
+}
+function refreshButtons() {
+  const egg = S.phase === 'egg';
+  btn.snack.disabled = egg;
+  btn.play.disabled = egg;
+  btn.polish.disabled = egg || !polishReady;
+  btn.nap.disabled = egg;
+  $('#napLabel').textContent = S.asleep ? 'Wake' : 'Nap';
+  btn.nap.setAttribute('aria-label', S.asleep ? 'Wake up' : 'Take a nap');
+}
+
+// ---------------------------------------------------------------- HUD
+const ageEl = $('#age'), lvlEl = $('#lvl'), moodEl = $('#mood');
+function renderHUD() {
+  STAT_KEYS.forEach((k) => {
+    const v = S.stats[k];
+    statEls[k].fill.style.width = v.toFixed(1) + '%';
+    statEls[k].root.classList.toggle('low', v < 25 && S.phase === 'pet');
+    statEls[k].root.setAttribute('aria-valuenow', String(Math.round(v)));
+  });
+  if (S.phase === 'egg') { ageEl.textContent = 'still an egg'; moodEl.textContent = ''; }
+  else {
+    const m = moons();
+    ageEl.textContent = m === 0 ? 'hatched today' : m + (m === 1 ? ' moon old' : ' moons old');
+    moodEl.textContent = moodWord();
+  }
+  lvlEl.textContent = String(S.level);
+}
+nameEl.addEventListener('input', () => {
+  const v = nameEl.value.trim();
+  if (v) { S.name = v; saveState(); }
+});
+nameEl.addEventListener('blur', () => { if (!nameEl.value.trim()) nameEl.value = S.name; });
+nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') nameEl.blur(); });
+
+function syncSoundBtn() {
+  const b = $('#btnSound');
+  b.setAttribute('aria-pressed', String(S.sound));
+  b.setAttribute('aria-label', S.sound ? 'Sound on' : 'Sound off');
+  b.querySelector('.on').style.display = S.sound ? '' : 'none';
+  b.querySelector('.off').style.display = S.sound ? 'none' : '';
+}
+$('#btnSound').addEventListener('click', () => { S.sound = !S.sound; syncSoundBtn(); saveState(); if (S.sound) SFX.boop(); });
+$('#btnRestart').addEventListener('click', () => { $('#confirm').hidden = !$('#confirm').hidden; });
+$('#btnNo').addEventListener('click', () => { $('#confirm').hidden = true; });
+$('#btnYes').addEventListener('click', () => {
+  $('#confirm').hidden = true;
+  const sound = S.sound;
+  S = newState();
+  S.sound = sound;
+  if (snack) { scene.remove(snack.mesh); snack = null; }
+  while (bubbles.length) removeBubble(bubbles.length - 1);
+  round = null;
+  Object.assign(A, { hopT: -1, squash: 0, squashV: 0, spinT: -1, shakeT: 0, dizzyT: 0, sneezeT: -1, hiccupT: 0, cheerT: 0, rubT: 0, waveT: 0, chompT: 0, mouthOpenTarget: 0, eggWob: 0, eggWobV: 0, hatchPop: 1 });
+  speechEl.classList.remove('show');
+  applyPhase();
+  saveState();
+});
+
+btn.snack.addEventListener('click', feed);
+btn.play.addEventListener('click', startBubbles);
+btn.polish.addEventListener('click', spaPolish);
+btn.nap.addEventListener('click', () => { if (S.asleep) wake(false); else sleep(); });
+
+// ---------------------------------------------------------------- pointer
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const pointer = { down: false, id: null, x: 0, y: 0, lx: 0, ly: 0, t0: 0, moved: 0, onBody: false, lastActive: -10, world: new V3(0, 1.5, 4), downPoint: new V3() };
+const lookPlane = new THREE.Plane(new V3(0, 0, 1), -2);
+function setNdc(e) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+}
+function hitBody() {
+  const h = raycaster.intersectObject(body, false);
+  return h.length ? h[0].point : null;
+}
+function hitBubble(e) {
+  let best = -1, bestD = Infinity;
+  bubbles.forEach((b, i) => {
+    const p = toScreen(b.m.position);
+    const edge = toScreen(tmpV.set(b.m.position.x + b.r, b.m.position.y, b.m.position.z));
+    const rad = Math.max(34, Math.abs(edge.x - p.x) * 1.15);
+    const d = Math.hypot(e.clientX - p.x, e.clientY - p.y);
+    if (d < rad && d < bestD) { best = i; bestD = d; }
+  });
+  return best;
+}
+let audioUnlocked = false;
+canvas.addEventListener('pointerdown', (e) => {
+  if (!audioUnlocked) { audioUnlocked = true; audio(); }
+  setNdc(e);
+  pointer.lastActive = clockT;
+  raycaster.ray.intersectPlane(lookPlane, pointer.world);
+  if (S.phase === 'egg') { crackEgg(); return; }
+  const bi = hitBubble(e);
+  if (bi >= 0) { popBubble(bi); return; }
+  const p = hitBody();
+  pointer.down = true; pointer.id = e.pointerId;
+  pointer.x = pointer.lx = e.clientX; pointer.y = pointer.ly = e.clientY;
+  pointer.t0 = performance.now(); pointer.moved = 0; pointer.onBody = !!p;
+  if (p) pointer.downPoint.copy(p);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignored */ }
+});
+canvas.addEventListener('pointermove', (e) => {
+  setNdc(e);
+  pointer.lastActive = clockT;
+  raycaster.ray.intersectPlane(lookPlane, pointer.world);
+  if (!pointer.down || e.pointerId !== pointer.id) return;
+  const d = Math.hypot(e.clientX - pointer.lx, e.clientY - pointer.ly);
+  pointer.lx = e.clientX; pointer.ly = e.clientY;
+  pointer.moved += d;
+  if (pointer.moved > 10 && S.phase === 'pet') {
+    const p = hitBody();
+    if (p) rub(p, d);
+  }
+});
+function endPointer(e) {
+  if (!pointer.down || e.pointerId !== pointer.id) return;
+  pointer.down = false;
+  if (S.phase === 'pet' && pointer.onBody && pointer.moved < 10 && performance.now() - pointer.t0 < 450) boop(pointer.downPoint);
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', (e) => { if (e.pointerId === pointer.id) pointer.down = false; });
+document.addEventListener('keydown', (e) => {
+  if (S && S.phase === 'egg' && (e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body) { e.preventDefault(); crackEgg(); }
+});
+
+// ---------------------------------------------------------------- resize
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  camDist = Math.max(2.95 / t, 2.05 / (t * camera.aspect));
+  camera.updateProjectionMatrix();
+  pointUniforms.uScale.value = renderer.domElement.height / (2 * t);
+}
+window.addEventListener('resize', resize);
+
+// ---------------------------------------------------------------- per-frame updates
+function tickStats(dt) {
+  const s = S.stats;
+  s.tummy -= (100 / DRAIN.tummy) * dt * (S.asleep ? 0.6 : 1);
+  s.giggles -= (100 / DRAIN.giggles) * dt * (S.asleep ? 0.3 : 1);
+  s.shine -= (100 / DRAIN.shine) * dt;
+  if (S.asleep) s.pep += 1.1 * dt;
+  else s.pep -= (100 / DRAIN.pep) * dt;
+  STAT_KEYS.forEach((k) => { s[k] = clamp(s[k], 0, 100); });
+}
+
+const eyeLocal = new V3();
+let auraT = 0, rainT = 0, zzzT = 0;
+function updatePet(dt) {
+  A.t += dt;
+  const T = A.t;
+  if (A.hatchPop < 1) A.hatchPop = Math.min(1, A.hatchPop + dt / 0.9);
+  const grow = 0.92 + Math.min(moons(), 8) * 0.015;
+  pet.scale.setScalar(grow * (A.hatchPop < 1 ? Math.max(0.001, elastic(A.hatchPop)) : 1));
+
+  // hop + squash
+  let y = 0;
+  if (A.hopT >= 0) {
+    A.hopT += dt / A.hopDur;
+    if (A.hopT >= 1) { A.hopT = -1; A.squashV += 4 + A.hopH * 7; kickPupils(1.2); A.antV += 3; }
+    else y = A.hopH * 4 * A.hopT * (1 - A.hopT);
+  }
+  pet.position.y = y;
+  A.squashV += (-140 * A.squash - 10 * A.squashV) * dt;
+  A.squash = clamp(A.squash + A.squashV * dt, -0.6, 0.6);
+  A.sleepK += ((S.asleep ? 1 : 0) - A.sleepK) * Math.min(1, dt * 2);
+  const breathe = S.asleep ? Math.sin(T * 1.3) * 0.035 : Math.sin(T * 2.4) * 0.014;
+  const sq = A.squash;
+  rig.scale.set(1 + sq * 0.28 - breathe * 0.4, 1 - sq * 0.35 + breathe, 1 + sq * 0.28 - breathe * 0.4);
+
+  // sneeze, hiccups
+  if (A.sneezeT >= 0) {
+    const before = A.sneezeT;
+    A.sneezeT += dt;
+    if (before < 0.7 && A.sneezeT >= 0.7) {
+      SFX.sneeze(); buzz(25);
+      A.squashV += 7; hop(0.18, 0.3);
+      mouth.getWorldPosition(mouthWorld);
+      emit(mouthWorld, 50, { speed: 3.5, up: 0.4, dir: new V3(0, 0, 3), spread: 0.1 });
+    }
+    if (A.sneezeT > 1.3) { A.sneezeT = -1; if (Math.random() < 0.6) say('excuse me. that was glitter.'); }
+  }
+  if (A.hiccupT > 0) {
+    A.hiccupT -= dt; A.nextHic -= dt;
+    if (A.nextHic <= 0) {
+      A.nextHic = rand(0.9, 1.6);
+      hop(0.22, 0.25); SFX.hiccup();
+      mouth.getWorldPosition(mouthWorld);
+      emit(mouthWorld, 8, { speed: 1.4, up: 1.4, gravity: 0.6 });
+    }
+  }
+
+  // body rotation
+  let ry = 0, rz = 0, rx = 0;
+  if (A.spinT >= 0) { A.spinT += dt / 0.9; if (A.spinT >= 1) A.spinT = -1; else ry = ease(A.spinT) * Math.PI * 2; }
+  if (A.shakeT > 0) { A.shakeT -= dt; ry += Math.sin(T * 28) * 0.28 * Math.min(1, A.shakeT * 2); }
+  if (A.dizzyT > 0) { A.dizzyT -= dt; rz += Math.sin(T * 5) * 0.14; }
+  if (A.sneezeT >= 0 && A.sneezeT < 0.7) rx -= A.sneezeT * 0.25;
+
+  // where to look
+  if (snack && snack.phase === 'fly') tmpV.copy(snack.mesh.position);
+  else if (bubbles.length) {
+    let nb = bubbles[0];
+    bubbles.forEach((b) => { if (b.age < nb.age) nb = b; });
+    tmpV.copy(nb.m.position);
+  } else if (clockT - pointer.lastActive < 2.5) tmpV.copy(pointer.world);
+  else {
+    A.nextIdleLook -= dt;
+    if (A.nextIdleLook <= 0) {
+      A.nextIdleLook = rand(1.2, 3.5);
+      if (Math.random() < 0.45) A.idleLook.copy(camera.position);
+      else A.idleLook.set(rand(-3, 3), rand(0.4, 3.2), rand(1, 4));
+    }
+    tmpV.copy(A.idleLook);
+  }
+  A.lookTarget.lerp(tmpV, Math.min(1, dt * 6));
+  if (!S.asleep) {
+    rz += clamp(-A.lookTarget.x * 0.05, -0.12, 0.12);
+    rx += clamp(-(A.lookTarget.y - 1.6) * 0.04, -0.1, 0.1);
+  }
+  rz += A.sleepK * 0.12; rx += A.sleepK * 0.08;
+  rig.rotation.x += (rx - rig.rotation.x) * Math.min(1, dt * 8);
+  rig.rotation.z += (rz - rig.rotation.z) * Math.min(1, dt * 8);
+  rig.rotation.y = ry;
+
+  // eyes: googly springs + blinks
+  A.nextBlink -= dt;
+  if (A.nextBlink <= 0) {
+    A.nextBlink = rand(2, 5.5);
+    const wink = Math.random() < 0.12;
+    eyes.forEach((e, i) => { if (!wink || i === 1) e.blinkT = 0; });
+    if (Math.random() < 0.2) setTimeout(() => eyes.forEach((e) => { e.blinkT = 0; }), 260);
+  }
+  const mood = moodScore();
+  eyes.forEach((e) => {
+    let dx, dy;
+    if (A.dizzyT > 0) {
+      const a = T * 9 * e.dir;
+      dx = Math.cos(a) * e.R * 0.34; dy = Math.sin(a) * e.R * 0.34;
+    } else {
+      e.g.updateWorldMatrix(true, false);
+      e.g.worldToLocal(eyeLocal.copy(A.lookTarget)).normalize();
+      dx = eyeLocal.x * e.R * 0.42; dy = eyeLocal.y * e.R * 0.42;
+    }
+    e.v.x += ((dx - e.p.x) * 95 - e.v.x * 6) * dt;
+    e.v.y += ((dy - e.p.y) * 95 - e.v.y * 6) * dt;
+    e.p.x += e.v.x * dt; e.p.y += e.v.y * dt;
+    const max = e.R * 0.42, len = e.p.length();
+    if (len > max) {
+      e.p.multiplyScalar(max / len);
+      const nx = e.p.x / max, ny = e.p.y / max, vn = e.v.x * nx + e.v.y * ny;
+      if (vn > 0) { e.v.x -= 1.6 * vn * nx; e.v.y -= 1.6 * vn * ny; }
+    }
+    const r2 = Math.min(1, (e.p.length() / e.R) ** 2);
+    e.pupil.position.set(e.p.x, e.p.y, e.R * (0.75 * Math.sqrt(1 - r2) - 0.1));
+    let lid = 1;
+    if (S.asleep) lid = 0.07;
+    else if (A.sneezeT >= 0 && A.sneezeT < 0.9) lid = 0.15;
+    else if (A.rubT > 0 || A.cheerT > 0) lid = 0.32;
+    else if (mood < 30) lid = 0.62;
+    if (e.blinkT >= 0) {
+      e.blinkT += dt / 0.16;
+      if (e.blinkT >= 1) e.blinkT = -1;
+      else lid *= 1 - 0.92 * Math.sin(Math.PI * e.blinkT);
+    }
+    e.lidV += (lid - e.lidV) * Math.min(1, dt * 20);
+    e.lid.scale.y = Math.max(0.05, e.lidV);
+  });
+
+  // mouth
+  let smileT = clamp((mood - 35) / 40, -0.9, 1);
+  if (A.cheerT > 0 || A.rubT > 0) smileT = 1;
+  A.smile += (smileT - A.smile) * Math.min(1, dt * 5);
+  let open = A.mouthOpenTarget;
+  if (A.chompT > 0) { A.chompT -= dt; open = 0.2 + 0.6 * Math.abs(Math.sin(A.chompT * 16)); }
+  if (A.cheerT > 0) open = Math.max(open, 0.55);
+  if (S.asleep) open = 0.2 + Math.sin(T * 1.3) * 0.08;
+  if (A.sneezeT >= 0 && A.sneezeT < 0.7) open = 0.08;
+  A.mouthOpen += (open - A.mouthOpen) * Math.min(1, dt * 14);
+  oMouth.visible = A.mouthOpen > 0.06;
+  oMouth.scale.set(0.6 + 0.5 * A.mouthOpen, Math.max(0.05, A.mouthOpen), 1);
+  smile.visible = A.mouthOpen < 0.32 && !S.asleep;
+  const sy = (A.smile < 0 ? -1 : 1) * Math.max(0.18, Math.abs(A.smile));
+  smile.scale.y = sy;
+  smile.position.y = 0.08 * sy;
+
+  // arms
+  let armA = -0.25 + Math.sin(T * 2) * 0.06;
+  if (A.cheerT > 0 || A.rubT > 0) armA = 0.6 + Math.sin(T * 20) * 0.35;
+  if (S.asleep) armA = -0.45;
+  arms.L.rotation.z = -armA;
+  let armR = armA;
+  if (A.waveT > 0) { A.waveT -= dt; armR = 1.25 + Math.sin(T * 14) * 0.45; }
+  arms.R.rotation.z = armR;
+
+  // antenna + star
+  const antT = Math.sin(T * 1.6) * 0.1 - rig.rotation.z * 0.8 - A.sleepK * 0.5;
+  A.antV += ((antT - A.antA) * 45 - A.antV * 3.2) * dt;
+  A.antA += A.antV * dt;
+  antenna.rotation.z = A.antA;
+  antenna.rotation.x = Math.sin(T * 1.1) * 0.06;
+  star.rotation.z += dt * (S.asleep ? 0.2 : 1.2);
+  starLight.intensity = S.asleep ? 0.15 : 0.7 + Math.sin(T * 5) * 0.15;
+  starMat.emissiveIntensity = S.asleep ? 0.3 : 0.9;
+
+  // cheeks, timers
+  A.blush = Math.max(0, A.blush - dt * 0.5);
+  cheeks.forEach((c) => { c.material.opacity = 0.12 + 0.42 * (S.stats.giggles / 100) + A.blush; });
+  A.cheerT = Math.max(0, A.cheerT - dt);
+  A.rubT = Math.max(0, A.rubT - dt);
+  bodyUniforms.uPokeAmt.value *= Math.exp(-dt * 5);
+
+  // look + colour from stats
+  const satT = 0.22 + 0.78 * (S.stats.shine / 100);
+  bodyUniforms.uSat.value += (satT - bodyUniforms.uSat.value) * Math.min(1, dt * 2);
+  const gloomT = clamp((45 - mood) / 35, 0, 1);
+  bodyUniforms.uGloom.value += (gloomT - bodyUniforms.uGloom.value) * Math.min(1, dt * 2);
+  bodyUniforms.uSleep.value = A.sleepK;
+  bodyUniforms.uWobble.value = 1 + (A.rubT > 0 ? 1.5 : 0) + (A.cheerT > 0 ? 0.8 : 0);
+  if (A.cheerT > 0) A.hueShift += dt * 0.5;
+  bodyUniforms.uHue.value = S.hue + A.hueShift + (A.dizzyT > 0 ? T * 0.6 : 0);
+
+  // trinkets
+  moonlets.forEach((m) => {
+    if (!m.visible) return;
+    const u = m.userData, a = T * u.speed + u.phase;
+    m.position.set(Math.cos(a) * u.r, 1.15 + Math.sin(a) * u.r * u.tilt, Math.sin(a) * u.r);
+  });
+  halo.position.y = 2.42 + Math.sin(T * 2) * 0.03;
+  halo.rotation.y = Math.sin(T * 0.7) * 0.15;
+
+  // gloom cloud + rain
+  const gloomy = !S.asleep && mood <= 22;
+  A.cloudS += ((gloomy ? 1 : 0) - A.cloudS) * Math.min(1, dt * 3);
+  cloud.scale.setScalar(Math.max(0.001, A.cloudS));
+  cloud.position.x = 0.35 + Math.sin(T * 0.8) * 0.15;
+  cloud.position.y = 3.25 + Math.sin(T * 1.6) * 0.05;
+  if (A.cloudS > 0.6) {
+    rainT -= dt;
+    if (rainT <= 0) {
+      rainT = 0.07;
+      cloud.getWorldPosition(tmpV);
+      tmpV.x += rand(-0.35, 0.35); tmpV.y -= 0.2;
+      emit(tmpV, 1, { speed: 0, up: -2.2, gravity: 4, drag: 0, size: [0.06, 0.09], colors: [0x9fd8ff, 0xcfe0ff], life: [0.4, 0.55], spread: 0 });
+    }
+  }
+
+  // sparkle aura when shiny
+  if (!S.asleep && S.stats.shine > 60) {
+    auraT -= dt;
+    if (auraT <= 0) {
+      auraT = 0.5 - (S.stats.shine - 60) / 40 * 0.38;
+      const p = pet.localToWorld(surf(rand(-2.2, 2.2), rand(-0.6, 1.2), 1.12));
+      emit(p, 1, { speed: 0.2, up: 0.5, gravity: -0.15, drag: 0.5, size: [0.08, 0.15], life: [0.9, 1.5], spread: 0 });
+    }
+  }
+  if (S.asleep) {
+    zzzT -= dt;
+    if (zzzT <= 0) { zzzT = 1.7; floatText('z', null, headWorld(2.2).add(new V3(0.6, 0, 0)), 'z'); }
+    if (S.stats.pep >= 100) wake(true);
+  }
+
+  // idle quirks
+  if (!S.asleep && !snack && !round && A.hatchPop >= 1) {
+    A.nextQuirk -= dt;
+    if (A.nextQuirk <= 0) { A.nextQuirk = rand(7, 14); doQuirk(); }
+  }
+
+  // shadow
+  shadow.scale.setScalar(1.15 * grow * (1 - y * 0.35));
+  shadow.material.opacity = 0.6 * (1 - y * 0.4);
+}
+
+function updateEgg(dt) {
+  A.eggWobV += (-60 * A.eggWob - 4 * A.eggWobV) * dt;
+  A.eggWob += A.eggWobV * dt;
+  const idle = Math.sin(A.t * 3) * 0.04 * (1 + S.eggTaps * 0.6);
+  eggPivot.rotation.z = A.eggWob * 0.06 + idle;
+  eggPivot.rotation.y += dt * 0.3;
+  eggUniforms.uHue.value = S.hue + 0.5 + A.t * 0.05;
+  shadow.scale.setScalar(1.0);
+  shadow.material.opacity = 0.55;
+  A.t += dt;
+  auraT -= dt;
+  if (auraT <= 0) {
+    auraT = 0.25;
+    emit(new V3(rand(-0.9, 0.9), rand(0.2, 2.2), rand(0.2, 0.9)), 1, { speed: 0.2, up: 0.4, gravity: -0.15, size: [0.08, 0.15], life: [0.9, 1.4], spread: 0 });
+  }
+}
+
+let clockT = 0, uiT = 0, saveT = 5, lastNow = performance.now();
+const cam = { x: 0, y: 0 };
+function updateCamera(dt) {
+  const px = reduceMotion ? 0 : (clockT - pointer.lastActive < 3 ? ndc.x * 0.35 : 0) + Math.sin(clockT * 0.2) * 0.25;
+  const py = reduceMotion ? 0 : (clockT - pointer.lastActive < 3 ? ndc.y * 0.2 : 0);
+  cam.x += (px - cam.x) * Math.min(1, dt * 2);
+  cam.y += (py - cam.y) * Math.min(1, dt * 2);
+  camera.position.set(cam.x, LOOK_Y + camDist * 0.17 + cam.y, camDist);
+  camera.lookAt(0, LOOK_Y, 0);
+}
+function placeSpeech() {
+  if (!speechEl.classList.contains('show')) return;
+  const p = toScreen(headWorld(S.phase === 'egg' ? 2.4 : 3.0));
+  const w = speechEl.offsetWidth, h = speechEl.offsetHeight;
+  const pad = 12;
+  const hudBottom = document.querySelector('.stats').getBoundingClientRect().bottom + 10;
+  const x = clamp(p.x - w / 2, pad, window.innerWidth - w - pad);
+  const yTop = Math.max(hudBottom, p.y - h - 10);
+  speechEl.style.transform = 'translate(' + x.toFixed(1) + 'px,' + yTop.toFixed(1) + 'px)';
+  speechEl.style.setProperty('--tail', clamp(p.x - x, 18, w - 18).toFixed(1) + 'px');
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - lastNow) / 1000, 0.05);
+  lastNow = now;
+  clockT += dt;
+  pointUniforms.uTime.value = clockT;
+
+  if (S.phase === 'pet') { tickStats(dt); updatePet(dt); }
+  else updateEgg(dt);
+  updateSnack(dt);
+  updateBubbles(dt);
+  updateSparks(dt);
+  updateField(dt);
+  crystals.forEach((c) => { c.material.emissiveIntensity = (0.35 + 0.3 * Math.sin(clockT * 1.5 + c.userData.phase)) * (1 - A.sleepK * 0.6); });
+
+  const night = A.sleepK;
+  hemi.intensity = 0.9 - night * 0.55;
+  keyLight.intensity = 0.9 - night * 0.6;
+  islandUniforms.uSleep.value = night;
+
+  updateCamera(dt);
+  renderer.render(scene, camera);
+
+  if (speechT > 0) { speechT -= dt; if (speechT <= 0) speechEl.classList.remove('show'); }
+  placeSpeech();
+  if (hintT > 0) { hintT -= dt; if (hintT <= 0) hintEl.classList.remove('show'); }
+  uiT -= dt;
+  if (uiT <= 0) { uiT = 0.25; renderHUD(); }
+  saveT -= dt;
+  if (saveT <= 0) { saveT = 5; saveState(); }
+}
+
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveState(); });
+window.addEventListener('pagehide', saveState);
+
+// ---------------------------------------------------------------- boot
+function start(hotData) {
+  S = loadState(hotData) || newState();
+  // catch up on time spent away (capped at 12 hours)
+  const away = clamp((Date.now() - (S.lastTick || Date.now())) / 1000, 0, 12 * 3600);
+  let welcome = null;
+  if (S.phase === 'pet' && away > 60) {
+    const wasAsleep = S.asleep;
+    tickStats(away);
+    if (wasAsleep && S.stats.pep >= 100) { S.asleep = false; welcome = pick(DREAM_LINES); }
+    else if (away > 1800) welcome = pick(['you came back!', 'i missed you a normal amount. (a lot.)', 'i kept the island warm for you.']);
+  }
+  resize();
+  syncSoundBtn();
+  applyPhase();
+  if (S.phase === 'pet') {
+    if (welcome) setTimeout(() => say(welcome), 700);
+    else setTimeout(() => say('hi again. i was being round.', 2.6), 900);
+  }
+  saveState();
+  requestAnimationFrame((t) => { lastNow = t; frame(t); });
+}
+const hot = window.claude && window.claude.hot;
+if (hot && hot.ready) hot.ready((d) => start(d || {}));
+else start((hot && hot.data) || {});
+})();
+</script>
